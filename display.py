@@ -2,6 +2,7 @@ import pandas as pd
 import folium
 import streamlit as st
 from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium  # Correct import
 import ast  # To safely parse coordinates
 
 # Streamlit app title
