@@ -88,3 +88,6 @@ if csv_file:
     # Display the map in Streamlit using streamlit-folium
     st.write("### Interactive Satellite Map with Pipes and Landmarks")
     st_folium(folium_map, width=900, height=600)
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
