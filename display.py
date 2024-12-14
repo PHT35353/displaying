@@ -1,4 +1,5 @@
 import requests
+import uvicorn
 import pandas as pd
 import folium
 import streamlit as st
