@@ -1,6 +1,5 @@
 pandas
 folium
 fastapi
-uvicorn
 streamlit
 streamlit-folium
