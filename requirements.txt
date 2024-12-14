@@ -1,6 +1,4 @@
-pandas
-folium
 fastapi
 uvicorn
-streamlit
-streamlit-folium
+pandas
+python-multipart
