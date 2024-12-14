@@ -1,9 +1,6 @@
-streamlit
 pandas
-matplotlib
-Pillow
-requests
-plotly
-numpy
 folium
+fastapi
+uvicorn
+streamlit
 streamlit-folium
