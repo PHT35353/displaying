@@ -2,11 +2,11 @@ import pandas as pd
 import folium
 import streamlit as st
 from folium.plugins import MarkerCluster
-from streamlit_folium import st_folium  # Correct import
+from streamlit_folium import st_folium  # Correctly import st_folium
 import ast  # To safely parse coordinates
 
 # Streamlit app title
-st.title("High-Quality Satellite Map with Pipe and Landmark Drawings")
+st.title("Satellite Map with Pipes and Landmarks")
 
 # Mapbox access token (replace with your own)
 MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiY29kZW1hcCIsImEiOiJja2xsNzh2aTQwN3J1MnBvODFlOTlscXBkIn0.OEoHgUzO5DPkF-XUmSn_9A"
@@ -55,7 +55,9 @@ if csv_file:
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         name = row["Name"]
-        if row["Length (meters)"] > 0:  # It's a pipe
+
+        # Check if it's a pipe or a landmark
+        if row["Length (meters)"] > 0:  # Pipe
             # Add a polyline for the pipe
             popup_content = f"""
             <b>Name:</b> {name}<br>
@@ -70,7 +72,7 @@ if csv_file:
                 tooltip=name,
                 popup=folium.Popup(popup_content, max_width=300),
             ).add_to(folium_map)
-        else:  # It's a landmark
+        else:  # Landmark
             # Add a marker for the landmark
             popup_content = f"""
             <b>Name:</b> {name}<br>
@@ -78,11 +80,11 @@ if csv_file:
             """
             folium.Marker(
                 location=coords[0],
-                icon=folium.Icon(color="red", icon="info-sign"),
-                tooltip=name,
+                icon=folium.Icon(color="green", icon="info-sign"),
+                tooltip=f"Landmark: {name}",
                 popup=folium.Popup(popup_content, max_width=300),
             ).add_to(marker_cluster)
 
     # Display the map in Streamlit using streamlit-folium
-    st.write("### Interactive High-Quality Satellite Map")
+    st.write("### Interactive Satellite Map with Pipes and Landmarks")
     st_folium(folium_map, width=900, height=600)
