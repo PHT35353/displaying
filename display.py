@@ -22,7 +22,7 @@ if csv_file and screenshot_file:
     # Get the dimensions of the screenshot
     screenshot_width, screenshot_height = screenshot.size
 
-    # Convert coordinates from string to lists
+    # Validate and clean the "Coordinates" column
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
@@ -68,16 +68,13 @@ if csv_file and screenshot_file:
             fig.add_trace(go.Scatter(
                 x=x,
                 y=[screenshot_height - yi for yi in y],  # Invert y-coordinates for Plotly's coordinate system
-                mode="lines+markers",
+                mode="lines+markers+text",
                 line=dict(color="blue", width=2),
                 marker=dict(size=8),
+                text=[f"{row['Name']}<br>Length: {row['Length (meters)']}m<br>Medium: {row['Medium']}"],
+                textposition="middle right",
                 name=row["Name"],
-                hovertemplate=(
-                    f"<b>Name:</b> {row['Name']}<br>"
-                    f"<b>Length:</b> {row['Length (meters)']} meters<br>"
-                    f"<b>Medium:</b> {row['Medium']}<br>"
-                    f"<b>Coordinates:</b> {coords}"
-                ),
+                hoverinfo="skip",  # Disable hover to avoid redundancy
             ))
 
     # Add landmarks (points) to the figure
@@ -89,13 +86,10 @@ if csv_file and screenshot_file:
                 y=[screenshot_height - coords[0][1]],  # Invert y-coordinates
                 mode="markers+text",
                 marker=dict(color="red", size=10),
-                text=[f"{row['Name']}<br>{coords[0]}"],
+                text=[f"{row['Name']}<br>Coordinates: {coords[0]}"],
                 textposition="top right",
                 name=row["Name"],
-                hovertemplate=(
-                    f"<b>Name:</b> {row['Name']}<br>"
-                    f"<b>Coordinates:</b> {coords[0]}"
-                ),
+                hoverinfo="skip",  # Disable hover to keep text always visible
             ))
 
     # Update layout
@@ -103,7 +97,7 @@ if csv_file and screenshot_file:
         title="Interactive Map with Pipes and Landmarks",
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        dragmode="pan",  # Allow panning on the map
+        dragmode=False,  # Disable dragging
         margin=dict(l=0, r=0, t=30, b=0),
     )
 
