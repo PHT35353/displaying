@@ -19,12 +19,13 @@ if csv_file and screenshot_file:
     # Load the map screenshot
     screenshot = Image.open(screenshot_file)
 
-    # Validate and clean the "Coordinates" column
+    # Get the dimensions of the screenshot
+    screenshot_width, screenshot_height = screenshot.size
+
+    # Convert coordinates from string to lists
     def validate_coordinates(coord):
         try:
-            # Parse coordinates (e.g., from string to list)
             parsed = eval(coord) if isinstance(coord, str) else coord
-            # Ensure it's a list of [x, y] or [[x1, y1], [x2, y2], ...]
             if isinstance(parsed, list) and all(
                 isinstance(c, list) and len(c) == 2 and all(isinstance(i, (int, float)) for i in c) for c in parsed
             ):
@@ -34,8 +35,6 @@ if csv_file and screenshot_file:
         return None  # Return None for invalid entries
 
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
-
-    # Filter out invalid rows
     valid_data = data.dropna(subset=["Coordinates"])
 
     # Create Plotly figure
@@ -47,14 +46,19 @@ if csv_file and screenshot_file:
             source=screenshot,
             xref="x",
             yref="y",
-            x=0, y=100,  # Adjust according to your map dimensions
-            sizex=100,
-            sizey=100,
+            x=0,
+            y=screenshot_height,  # Set the y-axis to match the image height
+            sizex=screenshot_width,  # Match the image width
+            sizey=screenshot_height,  # Match the image height
             xanchor="left",
             yanchor="top",
             layer="below",
         )
     )
+
+    # Adjust axis ranges to fit the image
+    fig.update_xaxes(range=[0, screenshot_width], visible=False)
+    fig.update_yaxes(range=[0, screenshot_height], visible=False, scaleanchor="x", scaleratio=1)
 
     # Add pipes (lines) to the figure
     for _, row in valid_data.iterrows():
@@ -63,7 +67,7 @@ if csv_file and screenshot_file:
             x, y = zip(*coords)  # Separate x and y coordinates
             fig.add_trace(go.Scatter(
                 x=x,
-                y=y,
+                y=[screenshot_height - yi for yi in y],  # Invert y-coordinates for Plotly's coordinate system
                 mode="lines+markers",
                 line=dict(color="blue", width=2),
                 marker=dict(size=8),
@@ -82,7 +86,7 @@ if csv_file and screenshot_file:
         if row["Length (meters)"] == 0:  # Landmark
             fig.add_trace(go.Scatter(
                 x=[coords[0][0]],
-                y=[coords[0][1]],
+                y=[screenshot_height - coords[0][1]],  # Invert y-coordinates
                 mode="markers+text",
                 marker=dict(color="red", size=10),
                 text=[f"{row['Name']}<br>{coords[0]}"],
