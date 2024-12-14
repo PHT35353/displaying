@@ -2,11 +2,13 @@ import pandas as pd
 import folium
 import streamlit as st
 from folium.plugins import MarkerCluster
-from streamlit_folium import st_folium  # Import the streamlit-folium wrapper
 import ast  # To safely parse coordinates
 
 # Streamlit app title
-st.title("Satellite Map with Pipe and Landmark Drawings")
+st.title("High-Quality Satellite Map with Pipe and Landmark Drawings")
+
+# Mapbox access token (replace with your own)
+MAPBOX_ACCESS_TOKEN = "pk.eyJ1IjoiY29kZW1hcCIsImEiOiJja2xsNzh2aTQwN3J1MnBvODFlOTlscXBkIn0.OEoHgUzO5DPkF-XUmSn_9A"
 
 # File upload for the .csv file
 csv_file = st.file_uploader("Upload the .csv file containing the pipe and landmark data", type=["csv"])
@@ -35,14 +37,14 @@ if csv_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Initialize a folium map (satellite view)
+    # Initialize a folium map with Mapbox Satellite style
     # Center the map based on the first valid coordinate or default to a location
     initial_coords = valid_data["Coordinates"].iloc[0][0] if not valid_data.empty else [0, 0]
     folium_map = folium.Map(
         location=initial_coords,
         zoom_start=15,
-        tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attr="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+        tiles=f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{{z}}/{{x}}/{{y}}?access_token={MAPBOX_ACCESS_TOKEN}",
+        attr="Mapbox Satellite | &copy; <a href='https://www.mapbox.com/about/maps/'>Mapbox</a>"
     )
 
     # Add a marker cluster for landmarks
@@ -81,5 +83,5 @@ if csv_file:
             ).add_to(marker_cluster)
 
     # Display the map in Streamlit using streamlit-folium
-    st.write("### Interactive Satellite Map")
-    st_folium(folium_map, width=700, height=500)
+    st.write("### Interactive High-Quality Satellite Map")
+    st_folium(folium_map, width=900, height=600)
