@@ -1,6 +1,5 @@
 import pandas as pd
 import streamlit as st
-import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
 
@@ -20,8 +19,20 @@ if csv_file and screenshot_file:
     # Load the map screenshot
     screenshot = Image.open(screenshot_file)
 
-    # Convert coordinates from string to lists
-    data["Coordinates"] = data["Coordinates"].apply(eval)
+    # Validate and convert the Coordinates column
+    def validate_coordinates(coord):
+        try:
+            parsed = eval(coord) if isinstance(coord, str) else coord
+            if isinstance(parsed, list) and all(isinstance(c, list) and len(c) == 2 for c in parsed):
+                return parsed
+        except:
+            return None  # Return None if invalid
+        return None
+
+    data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
+
+    # Filter out rows with invalid coordinates
+    valid_data = data.dropna(subset=["Coordinates"])
 
     # Create Plotly figure
     fig = go.Figure()
@@ -42,10 +53,10 @@ if csv_file and screenshot_file:
     )
 
     # Add pipes (lines) to the figure
-    for _, row in data.iterrows():
+    for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
-        x, y = zip(*coords)  # Separate x and y coordinates
-        if row["Length (meters)"] > 0:  # Pipe
+        if coords and row["Length (meters)"] > 0:  # Pipe
+            x, y = zip(*coords)  # Separate x and y coordinates
             fig.add_trace(go.Scatter(
                 x=x, y=y,
                 mode="lines+markers+text",
@@ -56,9 +67,9 @@ if csv_file and screenshot_file:
             ))
 
     # Add landmarks (points) to the figure
-    for _, row in data.iterrows():
+    for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
-        if row["Length (meters)"] == 0:  # Landmark
+        if coords and row["Length (meters)"] == 0:  # Landmark
             fig.add_trace(go.Scatter(
                 x=[coords[0][0]], y=[coords[0][1]],
                 mode="markers+text",
@@ -80,11 +91,7 @@ if csv_file and screenshot_file:
     # Display the figure
     st.plotly_chart(fig, use_container_width=True)
 
-    # Interactive selection
-    st.write("Click on the map to get more information about a pipe or landmark.")
-
-    # Add interactivity to display info on click
-    if "click_data" in st.session_state:
-        selected_data = st.session_state["click_data"]
-        st.write("Selected Element Info:")
-        st.json(selected_data)
+    # Add a note if rows were skipped due to invalid coordinates
+    invalid_rows = data[data["Coordinates"].isna()]
+    if not invalid_rows.empty:
+        st.warning(f"Skipped {len(invalid_rows)} rows due to invalid or missing coordinates.")
