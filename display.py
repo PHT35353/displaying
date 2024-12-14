@@ -19,8 +19,24 @@ if csv_file and screenshot_file:
     # Load the map screenshot
     screenshot = Image.open(screenshot_file)
 
-    # Convert coordinates from string to lists
-    data["Coordinates"] = data["Coordinates"].apply(eval)
+    # Validate and clean the "Coordinates" column
+    def validate_coordinates(coord):
+        try:
+            # Parse coordinates (e.g., from string to list)
+            parsed = eval(coord) if isinstance(coord, str) else coord
+            # Ensure it's a list of [x, y] or [[x1, y1], [x2, y2], ...]
+            if isinstance(parsed, list) and all(
+                isinstance(c, list) and len(c) == 2 and all(isinstance(i, (int, float)) for i in c) for c in parsed
+            ):
+                return parsed
+        except:
+            pass
+        return None  # Return None for invalid entries
+
+    data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
+
+    # Filter out invalid rows
+    valid_data = data.dropna(subset=["Coordinates"])
 
     # Create Plotly figure
     fig = go.Figure()
@@ -41,7 +57,7 @@ if csv_file and screenshot_file:
     )
 
     # Add pipes (lines) to the figure
-    for _, row in data.iterrows():
+    for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         if row["Length (meters)"] > 0:  # Pipe
             x, y = zip(*coords)  # Separate x and y coordinates
@@ -61,7 +77,7 @@ if csv_file and screenshot_file:
             ))
 
     # Add landmarks (points) to the figure
-    for _, row in data.iterrows():
+    for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         if row["Length (meters)"] == 0:  # Landmark
             fig.add_trace(go.Scatter(
@@ -90,5 +106,7 @@ if csv_file and screenshot_file:
     # Display the figure
     st.plotly_chart(fig, use_container_width=True)
 
-    # Add interactivity to display all feature information
-    st.write("Hover over the map to view details about pipes and landmarks.")
+    # Add a note if rows were skipped due to invalid coordinates
+    invalid_rows = data[data["Coordinates"].isna()]
+    if not invalid_rows.empty:
+        st.warning(f"Skipped {len(invalid_rows)} rows due to invalid or missing coordinates.")
