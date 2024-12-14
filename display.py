@@ -2,6 +2,7 @@ import pandas as pd
 import folium
 import streamlit as st
 from folium.plugins import MarkerCluster
+from streamlit_folium import st_folium  # Import the streamlit-folium wrapper
 import ast  # To safely parse coordinates
 
 # Streamlit app title
@@ -79,6 +80,6 @@ if csv_file:
                 popup=folium.Popup(popup_content, max_width=300),
             ).add_to(marker_cluster)
 
-    # Display the map in Streamlit
+    # Display the map in Streamlit using streamlit-folium
     st.write("### Interactive Satellite Map")
-    st_folium_map = st._legacy_folium_static(folium_map)
+    st_folium(folium_map, width=700, height=500)
