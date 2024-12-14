@@ -19,20 +19,8 @@ if csv_file and screenshot_file:
     # Load the map screenshot
     screenshot = Image.open(screenshot_file)
 
-    # Validate and convert the Coordinates column
-    def validate_coordinates(coord):
-        try:
-            parsed = eval(coord) if isinstance(coord, str) else coord
-            if isinstance(parsed, list) and all(isinstance(c, list) and len(c) == 2 for c in parsed):
-                return parsed
-        except:
-            return None  # Return None if invalid
-        return None
-
-    data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
-
-    # Filter out rows with invalid coordinates
-    valid_data = data.dropna(subset=["Coordinates"])
+    # Convert coordinates from string to lists
+    data["Coordinates"] = data["Coordinates"].apply(eval)
 
     # Create Plotly figure
     fig = go.Figure()
@@ -53,30 +41,41 @@ if csv_file and screenshot_file:
     )
 
     # Add pipes (lines) to the figure
-    for _, row in valid_data.iterrows():
+    for _, row in data.iterrows():
         coords = row["Coordinates"]
-        if coords and row["Length (meters)"] > 0:  # Pipe
+        if row["Length (meters)"] > 0:  # Pipe
             x, y = zip(*coords)  # Separate x and y coordinates
             fig.add_trace(go.Scatter(
-                x=x, y=y,
-                mode="lines+markers+text",
+                x=x,
+                y=y,
+                mode="lines+markers",
                 line=dict(color="blue", width=2),
+                marker=dict(size=8),
                 name=row["Name"],
-                text=[row["Name"]] * len(x),
-                hoverinfo="text"
+                hovertemplate=(
+                    f"<b>Name:</b> {row['Name']}<br>"
+                    f"<b>Length:</b> {row['Length (meters)']} meters<br>"
+                    f"<b>Medium:</b> {row['Medium']}<br>"
+                    f"<b>Coordinates:</b> {coords}"
+                ),
             ))
 
     # Add landmarks (points) to the figure
-    for _, row in valid_data.iterrows():
+    for _, row in data.iterrows():
         coords = row["Coordinates"]
-        if coords and row["Length (meters)"] == 0:  # Landmark
+        if row["Length (meters)"] == 0:  # Landmark
             fig.add_trace(go.Scatter(
-                x=[coords[0][0]], y=[coords[0][1]],
+                x=[coords[0][0]],
+                y=[coords[0][1]],
                 mode="markers+text",
-                marker=dict(color="black", size=10),
+                marker=dict(color="red", size=10),
+                text=[f"{row['Name']}<br>{coords[0]}"],
+                textposition="top right",
                 name=row["Name"],
-                text=row["Name"],
-                hoverinfo="text"
+                hovertemplate=(
+                    f"<b>Name:</b> {row['Name']}<br>"
+                    f"<b>Coordinates:</b> {coords[0]}"
+                ),
             ))
 
     # Update layout
@@ -84,14 +83,12 @@ if csv_file and screenshot_file:
         title="Interactive Map with Pipes and Landmarks",
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        dragmode="select",  # Allow selection of points
-        margin=dict(l=0, r=0, t=0, b=0),
+        dragmode="pan",  # Allow panning on the map
+        margin=dict(l=0, r=0, t=30, b=0),
     )
 
     # Display the figure
     st.plotly_chart(fig, use_container_width=True)
 
-    # Add a note if rows were skipped due to invalid coordinates
-    invalid_rows = data[data["Coordinates"].isna()]
-    if not invalid_rows.empty:
-        st.warning(f"Skipped {len(invalid_rows)} rows due to invalid or missing coordinates.")
+    # Add interactivity to display all feature information
+    st.write("Hover over the map to view details about pipes and landmarks.")
