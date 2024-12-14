@@ -37,7 +37,12 @@ if csv_file:
     # Initialize a folium map (satellite view)
     # Center the map based on the first valid coordinate or default to a location
     initial_coords = valid_data["Coordinates"].iloc[0][0] if not valid_data.empty else [0, 0]
-    folium_map = folium.Map(location=initial_coords, zoom_start=15, tiles="Stamen Terrain")
+    folium_map = folium.Map(
+        location=initial_coords,
+        zoom_start=15,
+        tiles="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attr="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+    )
 
     # Add a marker cluster for landmarks
     marker_cluster = MarkerCluster().add_to(folium_map)
