@@ -58,15 +58,14 @@ if csv_file:
                     max_width=300
                 )
             ).add_to(m)
-        else:  # Landmarks (Displayed as red "lines" or "points")
-            landmark_line = [(lat, lon) for lon, lat in coords]  # Convert to (lat, lon)
-            folium.PolyLine(
-                landmark_line,
-                color="red",
-                weight=3,
+        else:  # Landmarks as Red Markers
+            landmark = coords[0]  # Single coordinate for landmarks
+            folium.Marker(
+                location=(landmark[1], landmark[0]),  # Latitude, Longitude
+                icon=folium.Icon(color="red", icon="info-sign"),
                 popup=folium.Popup(
                     f"Name: {row['Name']}<br>"
-                    f"Coordinates: {landmark_line[0]}",
+                    f"Coordinates: ({landmark[1]}, {landmark[0]})",
                     max_width=300
                 )
             ).add_to(m)
