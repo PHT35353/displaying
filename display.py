@@ -3,23 +3,21 @@ import streamlit as st
 import plotly.graph_objects as go
 from PIL import Image
 import numpy as np
-import cv2
 
 # Streamlit Title
-st.title("Auto-Aligned Map with Pipes and Landmarks Using Feature Detection")
+st.title("Auto-Aligned Map with Pipes and Landmarks (Fixed Scaling)")
 
 # File Uploaders
 csv_file = st.file_uploader("Upload the .csv file", type=["csv"])
 screenshot_file = st.file_uploader("Upload the map screenshot", type=["png", "jpg", "jpeg"])
 
 if csv_file and screenshot_file:
-    # Load Data
+    # Load CSV and Image
     data = pd.read_csv(csv_file)
     screenshot = Image.open(screenshot_file)
-    screenshot = np.array(screenshot)  # Convert to NumPy array
-    screenshot_height, screenshot_width = screenshot.shape[:2]
+    screenshot_width, screenshot_height = screenshot.size
 
-    # Validate Coordinates
+    # Coordinate Validation
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
@@ -30,44 +28,16 @@ if csv_file and screenshot_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Step 1: ORB Feature Detection
-    def detect_keypoints(image):
-        orb = cv2.ORB_create(500)
-        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        keypoints, descriptors = orb.detectAndCompute(gray, None)
-        return keypoints, descriptors
+    # Step 1: Normalize Coordinates to Image Bounds
+    all_coords = [coord for row in valid_data["Coordinates"] for coord in row]
+    x_min, x_max = min(x for x, _ in all_coords), max(x for x, _ in all_coords)
+    y_min, y_max = min(y for _, y in all_coords), max(y for _, y in all_coords)
 
-    # Step 2: Homography Using Keypoints
-    def find_homography(screenshot, coords):
-        keypoints_screenshot, descriptors_screenshot = detect_keypoints(screenshot)
-        # Simulate feature detection for geographic coordinates
-        keypoints_geo = np.array(coords, dtype=np.float32)
-
-        # Map ORB keypoints to pixel locations
-        keypoints_pixels = np.array([kp.pt for kp in keypoints_screenshot[:len(coords)]], dtype=np.float32)
-
-        if len(keypoints_geo) >= 4 and len(keypoints_pixels) >= 4:
-            homography_matrix, _ = cv2.findHomography(keypoints_geo, keypoints_pixels, cv2.RANSAC, 5.0)
-            return homography_matrix
-        else:
-            st.error("Not enough keypoints detected to compute homography.")
-            st.stop()
-
-    # Step 3: Transform Coordinates
-    def transform_coordinates(coords, matrix):
-        coords = np.array(coords, dtype=np.float32)
-        coords = np.c_[coords, np.ones(len(coords))]
-        transformed_coords = np.dot(matrix, coords.T).T
-        transformed_coords = transformed_coords[:, :2] / transformed_coords[:, 2:]
-        return transformed_coords
-
-    # Combine all coordinates into a single list for homography
-    all_geo_coords = []
-    for _, row in valid_data.iterrows():
-        all_geo_coords.extend(row["Coordinates"])
-
-    # Compute homography
-    homography_matrix = find_homography(screenshot, all_geo_coords)
+    def normalize_coordinates(coords):
+        """Scale and normalize coordinates to fit the image dimensions."""
+        x_scaled = [(x - x_min) / (x_max - x_min) * screenshot_width for x, _ in coords]
+        y_scaled = [(1 - (y - y_min) / (y_max - y_min)) * screenshot_height for _, y in coords]  # Flip y-axis
+        return list(zip(x_scaled, y_scaled))
 
     # Initialize Plotly Figure
     fig = go.Figure()
@@ -75,7 +45,7 @@ if csv_file and screenshot_file:
     # Add Screenshot as Background
     fig.add_layout_image(
         dict(
-            source=Image.fromarray(screenshot),
+            source=screenshot,
             xref="x", yref="y",
             x=0, y=screenshot_height,
             sizex=screenshot_width, sizey=screenshot_height,
@@ -83,15 +53,15 @@ if csv_file and screenshot_file:
         )
     )
 
-    # Step 4: Draw Pipes and Landmarks
+    # Step 2: Draw Pipes and Landmarks
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
-        transformed_coords = transform_coordinates(coords, homography_matrix)
+        scaled_coords = normalize_coordinates(coords)
 
         if row["Length (meters)"] > 0:  # Draw Pipes
-            x, y = transformed_coords[:, 0], transformed_coords[:, 1]
+            x, y = zip(*scaled_coords)
             fig.add_trace(go.Scatter(
-                x=x, y=[screenshot_height - yi for yi in y],
+                x=x, y=y,
                 mode="lines+markers",
                 line=dict(color="blue", width=3),
                 marker=dict(size=6),
@@ -104,7 +74,7 @@ if csv_file and screenshot_file:
                 )
             ))
         else:  # Draw Landmarks
-            x, y = transformed_coords[0][0], screenshot_height - transformed_coords[0][1]
+            x, y = scaled_coords[0]
             fig.add_trace(go.Scatter(
                 x=[x], y=[y],
                 mode="markers+text",
