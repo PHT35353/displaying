@@ -28,11 +28,11 @@ if csv_file:
 
     # Clean and Validate Data
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
-    valid_data = data.dropna(subset=["Coordinates"])  # Ensure valid coordinates only
+    valid_data = data.dropna(subset=["Coordinates"])
 
     # Separate Pipes and Landmarks
     pipes = valid_data.dropna(subset=["Length (meters)"])
-    landmarks = valid_data[valid_data["Length (meters)"].isna() | valid_data["Medium"].isna()]
+    landmarks = valid_data[valid_data["Length (meters)"].isna()]  # Explicitly filter landmarks
 
     # Debugging Outputs
     st.write("Pipes Data:")
