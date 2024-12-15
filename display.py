@@ -29,28 +29,37 @@ if csv_file and screenshot_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Step 1: Define Control Points for Homography
-    st.info("Using 4 reference points to calibrate the map.")
-    # Assume we know these control points for the map calibration
+    # Step 1: Detect Reference Points (Bounding Box Detection)
+    def detect_reference_points(image):
+        gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
+        edges = cv2.Canny(gray, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        reference_pixels = []
+        for cnt in contours:
+            x, y, w, h = cv2.boundingRect(cnt)
+            if w > 50 and h > 50:  # Filter small detections
+                reference_pixels.append([x, y])
+        return np.array(reference_pixels[:4], dtype=np.float32)
+
+    # Automatically detected pixel points
+    detected_pixels = detect_reference_points(screenshot)
+    if len(detected_pixels) < 4:
+        st.error("Could not detect enough reference points automatically. Please ensure the map is clear.")
+        st.stop()
+
+    # Geographic points from the CSV (assume four corner points exist)
     geographic_points = np.array([
-        [4.9044, 52.3676],  # Example: Longitude, Latitude (Top Left)
-        [4.9050, 52.3676],  # Example: Top Right
-        [4.9044, 52.3673],  # Bottom Left
-        [4.9050, 52.3673]   # Bottom Right
+        valid_data["Coordinates"].iloc[0][0],  # Top-left
+        valid_data["Coordinates"].iloc[0][-1],  # Top-right
+        valid_data["Coordinates"].iloc[-1][0],  # Bottom-left
+        valid_data["Coordinates"].iloc[-1][-1]  # Bottom-right
     ], dtype=np.float32)
 
-    # Corresponding Pixel Positions on the Map (manually measured or estimated)
-    pixel_points = np.array([
-        [100, 100],        # Top Left (x, y)
-        [screenshot_width - 100, 100],  # Top Right
-        [100, screenshot_height - 100], # Bottom Left
-        [screenshot_width - 100, screenshot_height - 100]  # Bottom Right
-    ], dtype=np.float32)
+    # Step 2: Compute Homography Matrix
+    homography_matrix, _ = cv2.findHomography(geographic_points, detected_pixels)
 
-    # Compute Homography Matrix
-    homography_matrix, _ = cv2.findHomography(geographic_points, pixel_points)
-
-    # Step 2: Transform Coordinates Using Homography
+    # Step 3: Transform Coordinates Using Homography
     def transform_coordinates(coords):
         coords = np.array(coords, dtype=np.float32)
         coords = np.c_[coords, np.ones(len(coords))]  # Convert to homogeneous coordinates
@@ -72,7 +81,7 @@ if csv_file and screenshot_file:
         )
     )
 
-    # Step 3: Draw Pipes and Landmarks
+    # Step 4: Draw Pipes and Landmarks
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         transformed_coords = transform_coordinates(coords)
