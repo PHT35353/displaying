@@ -17,26 +17,26 @@ if csv_file:
     # Load CSV File
     data = pd.read_csv(csv_file)
 
-    # Coordinate Validation Function (Improved)
+    # Coordinate Validation Function (Improved for single and multi-points)
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
-            # Ensure it's either a single coordinate or a list of coordinates
             if isinstance(parsed, list):
-                if all(len(c) == 2 for c in parsed):  # Multiple coordinates (lines)
+                if all(isinstance(c, list) and len(c) == 2 for c in parsed):  # Multi-point (pipe)
                     return parsed
-                elif len(parsed) == 2:  # Single coordinate (landmark)
-                    return [parsed]  # Wrap it in a list for uniformity
-        except:
+                elif len(parsed) == 2:  # Single point (landmark)
+                    return [parsed]  # Wrap single coordinate in a list
+        except Exception as e:
+            st.write(f"Error parsing coordinates: {coord}, Error: {e}")
             return None  # Invalid coordinate
         return None
 
-    # Apply Validation and Debug
+    # Apply Validation
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     st.write("Data After Coordinate Validation:")
     st.write(data)
 
-    # Avoid Dropping Landmarks: Retain All Valid Rows
+    # Keep only valid data
     valid_data = data.dropna(subset=["Coordinates"])
 
     # Initialize Map Centered at Mean Coordinates
@@ -53,8 +53,7 @@ if csv_file:
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
 
-        # Pipes: Multiple Coordinates
-        if len(coords) > 1:
+        if len(coords) > 1:  # Pipes: Multiple Coordinates
             pipe_line = [(lat, lon) for lon, lat in coords]
             folium.PolyLine(
                 pipe_line,
@@ -69,8 +68,7 @@ if csv_file:
                     max_width=300
                 )
             ).add_to(m)
-        # Landmarks: Single Coordinate
-        elif len(coords) == 1:
+        elif len(coords) == 1:  # Landmarks: Single Coordinate
             landmark = coords[0]
             folium.Marker(
                 location=(landmark[1], landmark[0]),  # Latitude, Longitude
@@ -82,7 +80,7 @@ if csv_file:
                 )
             ).add_to(m)
 
-    # Add Fullscreen Plugin
+    # Add Fullscreen Plugin for Better Viewing
     plugins.Fullscreen().add_to(m)
 
     # Display Map
