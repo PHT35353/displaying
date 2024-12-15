@@ -17,22 +17,27 @@ if csv_file:
     # Load CSV File
     data = pd.read_csv(csv_file)
 
-    # Coordinate Validation Function
+    # Coordinate Validation Function (Improved)
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
-            if isinstance(parsed, list) and all(len(c) == 2 for c in parsed):
-                return parsed
+            # Ensure it's either a single coordinate or a list of coordinates
+            if isinstance(parsed, list):
+                if all(len(c) == 2 for c in parsed):  # Multiple coordinates (lines)
+                    return parsed
+                elif len(parsed) == 2:  # Single coordinate (landmark)
+                    return [parsed]  # Wrap it in a list for uniformity
         except:
-            return None
+            return None  # Invalid coordinate
+        return None
 
-    # Clean and Validate Data
+    # Apply Validation and Debug
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
-    valid_data = data.dropna(subset=["Coordinates"])
+    st.write("Data After Coordinate Validation:")
+    st.write(data)
 
-    # Debug: Display Raw Valid Data
-    st.write("Valid Data:")
-    st.write(valid_data)
+    # Avoid Dropping Landmarks: Retain All Valid Rows
+    valid_data = data.dropna(subset=["Coordinates"])
 
     # Initialize Map Centered at Mean Coordinates
     all_coords = [coord for row in valid_data["Coordinates"] for coord in row]
@@ -40,7 +45,7 @@ if csv_file:
     avg_lon = sum(lon for lon, _ in all_coords) / len(all_coords)
     map_center = [avg_lat, avg_lon]
 
-    # Use Mapbox Satellite Tiles for a 3D View
+    # Use Mapbox Satellite Tiles
     tile_layer = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{{z}}/{{x}}/{{y}}@2x?access_token={mapbox_token}"
     m = folium.Map(location=map_center, zoom_start=21, max_zoom=21, tiles=tile_layer, attr="Mapbox")
 
@@ -48,8 +53,9 @@ if csv_file:
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
 
-        if len(coords) > 1:  # Pipes: Multiple Coordinates
-            pipe_line = [(lat, lon) for lon, lat in coords]  # Convert to (lat, lon)
+        # Pipes: Multiple Coordinates
+        if len(coords) > 1:
+            pipe_line = [(lat, lon) for lon, lat in coords]
             folium.PolyLine(
                 pipe_line,
                 color="blue",
@@ -63,8 +69,9 @@ if csv_file:
                     max_width=300
                 )
             ).add_to(m)
-        else:  # Landmarks: Single Coordinate
-            landmark = coords[0]  # Use the first and only coordinate
+        # Landmarks: Single Coordinate
+        elif len(coords) == 1:
+            landmark = coords[0]
             folium.Marker(
                 location=(landmark[1], landmark[0]),  # Latitude, Longitude
                 icon=folium.Icon(color="red", icon="info-sign"),
@@ -75,7 +82,7 @@ if csv_file:
                 )
             ).add_to(m)
 
-    # Add Fullscreen Plugin for Better Viewing
+    # Add Fullscreen Plugin
     plugins.Fullscreen().add_to(m)
 
     # Display Map
