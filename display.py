@@ -3,16 +3,17 @@ import streamlit as st
 import plotly.graph_objects as go
 from PIL import Image
 import numpy as np
+import cv2
 
 # Streamlit Title
-st.title("Perfectly Matched Map with Pipes and Landmarks")
+st.title("Perfectly Georeferenced Map with Pipes and Landmarks")
 
 # File Uploaders
 csv_file = st.file_uploader("Upload the .csv file", type=["csv"])
 screenshot_file = st.file_uploader("Upload the map screenshot", type=["png", "jpg", "jpeg"])
 
 if csv_file and screenshot_file:
-    # Load CSV and Image
+    # Load CSV and Screenshot
     data = pd.read_csv(csv_file)
     screenshot = Image.open(screenshot_file)
     screenshot_width, screenshot_height = screenshot.size
@@ -28,16 +29,32 @@ if csv_file and screenshot_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Step 1: Normalize Coordinates to Image Bounds with Correct Y-Flip
-    all_coords = [coord for row in valid_data["Coordinates"] for coord in row]
-    x_min, x_max = min(x for x, _ in all_coords), max(x for x, _ in all_coords)
-    y_min, y_max = min(y for _, y in all_coords), max(y for _, y in all_coords)
+    # Define Four Reference Points (Geographic Coordinates -> Pixel Locations)
+    # Replace these with actual coordinates and measured pixel positions
+    geo_points = np.array([
+        [4.904405, 52.367635],  # Top-left geographic coordinate
+        [4.905050, 52.367635],  # Top-right geographic coordinate
+        [4.904405, 52.367450],  # Bottom-left geographic coordinate
+        [4.905050, 52.367450]   # Bottom-right geographic coordinate
+    ], dtype=np.float32)
 
-    def normalize_coordinates(coords):
-        """Scale and normalize coordinates to fit the image dimensions with y-axis correction."""
-        x_scaled = [(x - x_min) / (x_max - x_min) * screenshot_width for x, _ in coords]
-        y_scaled = [(1 - (y - y_min) / (y_max - y_min)) * screenshot_height for _, y in coords]  # Flip y-axis
-        return list(zip(x_scaled, y_scaled))
+    pixel_points = np.array([
+        [100, 100],                         # Top-left pixel position
+        [screenshot_width - 100, 100],      # Top-right pixel position
+        [100, screenshot_height - 100],     # Bottom-left pixel position
+        [screenshot_width - 100, screenshot_height - 100]  # Bottom-right pixel position
+    ], dtype=np.float32)
+
+    # Step 1: Compute Homography Matrix
+    homography_matrix, _ = cv2.findHomography(geo_points, pixel_points)
+
+    # Step 2: Transform Coordinates Using Homography
+    def transform_coordinates(coords):
+        coords = np.array(coords, dtype=np.float32)
+        coords = np.c_[coords, np.ones(len(coords))]  # Convert to homogeneous coordinates
+        transformed_coords = np.dot(homography_matrix, coords.T).T
+        transformed_coords = transformed_coords[:, :2] / transformed_coords[:, 2:]
+        return transformed_coords
 
     # Initialize Plotly Figure
     fig = go.Figure()
@@ -53,15 +70,15 @@ if csv_file and screenshot_file:
         )
     )
 
-    # Step 2: Draw Pipes and Landmarks
+    # Step 3: Draw Pipes and Landmarks
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
-        scaled_coords = normalize_coordinates(coords)
+        transformed_coords = transform_coordinates(coords)
 
         if row["Length (meters)"] > 0:  # Draw Pipes
-            x, y = zip(*scaled_coords)
+            x, y = transformed_coords[:, 0], transformed_coords[:, 1]
             fig.add_trace(go.Scatter(
-                x=x, y=y,
+                x=x, y=[screenshot_height - yi for yi in y],
                 mode="lines+markers",
                 line=dict(color="blue", width=3),
                 marker=dict(size=6),
@@ -74,7 +91,7 @@ if csv_file and screenshot_file:
                 )
             ))
         else:  # Draw Landmarks
-            x, y = scaled_coords[0]
+            x, y = transformed_coords[0][0], screenshot_height - transformed_coords[0][1]
             fig.add_trace(go.Scatter(
                 x=[x], y=[y],
                 mode="markers+text",
@@ -90,7 +107,7 @@ if csv_file and screenshot_file:
 
     # Layout Adjustments
     fig.update_layout(
-        title="Perfectly Matched Map with Pipes and Landmarks",
+        title="Perfectly Georeferenced Map with Pipes and Landmarks",
         xaxis=dict(range=[0, screenshot_width], visible=False),
         yaxis=dict(range=[0, screenshot_height], visible=False, scaleanchor="x", scaleratio=1),
         margin=dict(l=0, r=0, t=30, b=0),
