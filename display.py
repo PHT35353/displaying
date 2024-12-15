@@ -1,24 +1,20 @@
 import pandas as pd
 import streamlit as st
-import plotly.graph_objects as go
-from PIL import Image
-import numpy as np
-import cv2
+import folium
+from folium import plugins
+from streamlit_folium import folium_static
 
 # Streamlit Title
-st.title("Perfectly Georeferenced Map with Pipes and Landmarks")
+st.title("Pipes and Landmarks on an Interactive Map")
 
 # File Uploaders
-csv_file = st.file_uploader("Upload the .csv file", type=["csv"])
-screenshot_file = st.file_uploader("Upload the map screenshot", type=["png", "jpg", "jpeg"])
+csv_file = st.file_uploader("Upload the .csv file with coordinates", type=["csv"])
 
-if csv_file and screenshot_file:
-    # Load CSV and Screenshot
+if csv_file:
+    # Load CSV File
     data = pd.read_csv(csv_file)
-    screenshot = Image.open(screenshot_file)
-    screenshot_width, screenshot_height = screenshot.size
 
-    # Coordinate Validation
+    # Coordinate Validation Function
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
@@ -29,90 +25,44 @@ if csv_file and screenshot_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Define Four Reference Points (Geographic Coordinates -> Pixel Locations)
-    # Replace these with actual coordinates and measured pixel positions
-    geo_points = np.array([
-        [4.904405, 52.367635],  # Top-left geographic coordinate
-        [4.905050, 52.367635],  # Top-right geographic coordinate
-        [4.904405, 52.367450],  # Bottom-left geographic coordinate
-        [4.905050, 52.367450]   # Bottom-right geographic coordinate
-    ], dtype=np.float32)
+    # Initialize Map Centered at Mean Coordinates
+    all_coords = [coord for row in valid_data["Coordinates"] for coord in row]
+    avg_lat = sum(lat for _, lat in all_coords) / len(all_coords)
+    avg_lon = sum(lon for lon, _ in all_coords) / len(all_coords)
+    map_center = [avg_lat, avg_lon]
 
-    pixel_points = np.array([
-        [100, 100],                         # Top-left pixel position
-        [screenshot_width - 100, 100],      # Top-right pixel position
-        [100, screenshot_height - 100],     # Bottom-left pixel position
-        [screenshot_width - 100, screenshot_height - 100]  # Bottom-right pixel position
-    ], dtype=np.float32)
+    m = folium.Map(location=map_center, zoom_start=15)
 
-    # Step 1: Compute Homography Matrix
-    homography_matrix, _ = cv2.findHomography(geo_points, pixel_points)
-
-    # Step 2: Transform Coordinates Using Homography
-    def transform_coordinates(coords):
-        coords = np.array(coords, dtype=np.float32)
-        coords = np.c_[coords, np.ones(len(coords))]  # Convert to homogeneous coordinates
-        transformed_coords = np.dot(homography_matrix, coords.T).T
-        transformed_coords = transformed_coords[:, :2] / transformed_coords[:, 2:]
-        return transformed_coords
-
-    # Initialize Plotly Figure
-    fig = go.Figure()
-
-    # Add Screenshot as Background
-    fig.add_layout_image(
-        dict(
-            source=screenshot,
-            xref="x", yref="y",
-            x=0, y=screenshot_height,
-            sizex=screenshot_width, sizey=screenshot_height,
-            xanchor="left", yanchor="top", layer="below"
-        )
-    )
-
-    # Step 3: Draw Pipes and Landmarks
+    # Add Pipes and Landmarks to the Map
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
-        transformed_coords = transform_coordinates(coords)
 
-        if row["Length (meters)"] > 0:  # Draw Pipes
-            x, y = transformed_coords[:, 0], transformed_coords[:, 1]
-            fig.add_trace(go.Scatter(
-                x=x, y=[screenshot_height - yi for yi in y],
-                mode="lines+markers",
-                line=dict(color="blue", width=3),
-                marker=dict(size=6),
-                name=row["Name"],
-                hoverinfo="text",
-                hovertext=(
-                    f"<b>Name:</b> {row['Name']}<br>"
-                    f"<b>Medium:</b> {row['Medium']}<br>"
-                    f"<b>Coordinates:</b> {row['Coordinates']}"
+        if row["Length (meters)"] > 0:  # Pipes
+            # Add Pipe as a Polyline
+            pipe_line = [(lat, lon) for lon, lat in coords]  # Convert to (lat, lon)
+            folium.PolyLine(
+                pipe_line,
+                color="blue",
+                weight=3,
+                popup=folium.Popup(
+                    f"Name: {row['Name']}<br>Medium: {row['Medium']}<br>Length: {row['Length (meters)']} meters",
+                    max_width=300
                 )
-            ))
-        else:  # Draw Landmarks
-            x, y = transformed_coords[0][0], screenshot_height - transformed_coords[0][1]
-            fig.add_trace(go.Scatter(
-                x=[x], y=[y],
-                mode="markers+text",
-                marker=dict(color="red", size=10),
-                text=[row['Name']],
-                textposition="top right",
-                hoverinfo="text",
-                hovertext=(
-                    f"<b>Name:</b> {row['Name']}<br>"
-                    f"<b>Coordinates:</b> {row['Coordinates'][0]}"
+            ).add_to(m)
+        else:  # Landmarks
+            # Add Landmark as a Marker
+            landmark = coords[0]
+            folium.Marker(
+                location=(landmark[1], landmark[0]),  # (lat, lon)
+                icon=folium.Icon(color="red", icon="info-sign"),
+                popup=folium.Popup(
+                    f"Name: {row['Name']}<br>Coordinates: ({landmark[1]}, {landmark[0]})",
+                    max_width=300
                 )
-            ))
+            ).add_to(m)
 
-    # Layout Adjustments
-    fig.update_layout(
-        title="Perfectly Georeferenced Map with Pipes and Landmarks",
-        xaxis=dict(range=[0, screenshot_width], visible=False),
-        yaxis=dict(range=[0, screenshot_height], visible=False, scaleanchor="x", scaleratio=1),
-        margin=dict(l=0, r=0, t=30, b=0),
-        dragmode="pan",
-    )
+    # Add Fullscreen Plugin for Better Viewing
+    plugins.Fullscreen().add_to(m)
 
-    # Display the Map
-    st.plotly_chart(fig, use_container_width=True)
+    # Display Map
+    folium_static(m)
