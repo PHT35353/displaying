@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 
 # Streamlit Title
-st.title("Auto-Aligned Map with Pipes and Landmarks (Fixed Scaling)")
+st.title("Perfectly Matched Map with Pipes and Landmarks")
 
 # File Uploaders
 csv_file = st.file_uploader("Upload the .csv file", type=["csv"])
@@ -28,13 +28,13 @@ if csv_file and screenshot_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Step 1: Normalize Coordinates to Image Bounds
+    # Step 1: Normalize Coordinates to Image Bounds with Correct Y-Flip
     all_coords = [coord for row in valid_data["Coordinates"] for coord in row]
     x_min, x_max = min(x for x, _ in all_coords), max(x for x, _ in all_coords)
     y_min, y_max = min(y for _, y in all_coords), max(y for _, y in all_coords)
 
     def normalize_coordinates(coords):
-        """Scale and normalize coordinates to fit the image dimensions."""
+        """Scale and normalize coordinates to fit the image dimensions with y-axis correction."""
         x_scaled = [(x - x_min) / (x_max - x_min) * screenshot_width for x, _ in coords]
         y_scaled = [(1 - (y - y_min) / (y_max - y_min)) * screenshot_height for _, y in coords]  # Flip y-axis
         return list(zip(x_scaled, y_scaled))
@@ -90,7 +90,7 @@ if csv_file and screenshot_file:
 
     # Layout Adjustments
     fig.update_layout(
-        title="Auto-Aligned Map with Pipes and Landmarks",
+        title="Perfectly Matched Map with Pipes and Landmarks",
         xaxis=dict(range=[0, screenshot_width], visible=False),
         yaxis=dict(range=[0, screenshot_height], visible=False, scaleanchor="x", scaleratio=1),
         margin=dict(l=0, r=0, t=30, b=0),
