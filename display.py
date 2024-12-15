@@ -28,6 +28,10 @@ if csv_file:
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
+    # Debug: Print all data rows
+    st.write("Valid Data (Debugging):")
+    st.write(valid_data)
+
     # Initialize Map Centered at Mean Coordinates
     all_coords = [coord for row in valid_data["Coordinates"] for coord in row]
     avg_lat = sum(lat for _, lat in all_coords) / len(all_coords)
@@ -41,9 +45,9 @@ if csv_file:
     # Add Pipes and Landmarks to the Map
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
+        st.write(f"Processing Row: {row['Name']} | Coordinates: {coords}")  # Debug output
 
         if row["Length (meters)"] > 0:  # Pipes
-            # Add Pipe as a Polyline
             pipe_line = [(lat, lon) for lon, lat in coords]  # Convert to (lat, lon)
             folium.PolyLine(
                 pipe_line,
@@ -58,17 +62,19 @@ if csv_file:
                     max_width=300
                 )
             ).add_to(m)
-        else:  # Landmarks as Red Markers
-            landmark = coords[0]  # Single coordinate for landmarks
-            folium.Marker(
-                location=(landmark[1], landmark[0]),  # Latitude, Longitude
-                icon=folium.Icon(color="red", icon="info-sign"),
-                popup=folium.Popup(
-                    f"Name: {row['Name']}<br>"
-                    f"Coordinates: ({landmark[1]}, {landmark[0]})",
-                    max_width=300
-                )
-            ).add_to(m)
+        else:  # Landmarks
+            landmark = coords[0]  # Take the first coordinate
+            st.write(f"Adding Landmark: {row['Name']} | Coordinates: {landmark}")  # Debug output
+            if landmark:  # Ensure landmark coordinates are valid
+                folium.Marker(
+                    location=(landmark[1], landmark[0]),  # Latitude, Longitude
+                    icon=folium.Icon(color="red", icon="info-sign"),
+                    popup=folium.Popup(
+                        f"Name: {row['Name']}<br>"
+                        f"Coordinates: ({landmark[1]}, {landmark[0]})",
+                        max_width=300
+                    )
+                ).add_to(m)
 
     # Add Fullscreen Plugin for Better Viewing
     plugins.Fullscreen().add_to(m)
