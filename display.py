@@ -3,26 +3,24 @@ import streamlit as st
 import plotly.graph_objects as go
 from PIL import Image
 
-# Load the uploaded CSV and image
-st.title("Interactive Map with Pipe and Landmark Information")
+# Title
+st.title("Interactive Map with Pipes and Landmarks")
 
-# Upload CSV file
+# Upload files
 csv_file = st.file_uploader("Upload the .csv file containing the pipe and landmark data", type=["csv"])
 screenshot_file = st.file_uploader("Upload the map screenshot", type=["png", "jpg", "jpeg"])
 
 if csv_file and screenshot_file:
-    # Load the CSV data
+    # Load data
     data = pd.read_csv(csv_file)
     st.write("Uploaded Data:")
     st.dataframe(data)
 
-    # Load the map screenshot
+    # Load image
     screenshot = Image.open(screenshot_file)
-
-    # Get the dimensions of the screenshot
     screenshot_width, screenshot_height = screenshot.size
 
-    # Convert coordinates from string to lists
+    # Coordinate validation
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
@@ -32,12 +30,12 @@ if csv_file and screenshot_file:
                 return parsed
         except:
             pass
-        return None  # Return None for invalid entries
+        return None
 
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Create Plotly figure
+    # Initialize Plotly figure
     fig = go.Figure()
 
     # Add the map screenshot as a background
@@ -47,31 +45,31 @@ if csv_file and screenshot_file:
             xref="x",
             yref="y",
             x=0,
-            y=screenshot_height,  # Set the y-axis to match the image height
-            sizex=screenshot_width,  # Match the image width
-            sizey=screenshot_height,  # Match the image height
+            y=screenshot_height,
+            sizex=screenshot_width,
+            sizey=screenshot_height,
             xanchor="left",
             yanchor="top",
             layer="below",
         )
     )
 
-    # Adjust axis ranges to fit the image
+    # Adjust axes
     fig.update_xaxes(range=[0, screenshot_width], visible=False)
     fig.update_yaxes(range=[0, screenshot_height], visible=False, scaleanchor="x", scaleratio=1)
 
-    # Add pipes (lines) to the figure
+    # Draw pipes (lines)
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         if row["Length (meters)"] > 0:  # Pipe
-            x, y = zip(*coords)  # Separate x and y coordinates
+            x, y = zip(*coords)
             fig.add_trace(go.Scatter(
                 x=x,
-                y=[screenshot_height - yi for yi in y],  # Invert y-coordinates for Plotly's coordinate system
+                y=[screenshot_height - yi for yi in y],
                 mode="lines+markers",
                 line=dict(color="blue", width=2),
                 marker=dict(size=8),
-                name=row["Name"],
+                name=f"{row['Name']} ({row['Medium']})",
                 hovertemplate=(
                     f"<b>Name:</b> {row['Name']}<br>"
                     f"<b>Length:</b> {row['Length (meters)']} meters<br>"
@@ -80,37 +78,35 @@ if csv_file and screenshot_file:
                 ),
             ))
 
-    # Add landmarks (points) to the figure
+    # Draw landmarks (points)
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         if row["Length (meters)"] == 0:  # Landmark
             fig.add_trace(go.Scatter(
                 x=[coords[0][0]],
-                y=[screenshot_height - coords[0][1]],  # Invert y-coordinates
+                y=[screenshot_height - coords[0][1]],
                 mode="markers+text",
                 marker=dict(color="red", size=10),
-                text=[f"{row['Name']}<br>{coords[0]}"],
+                text=[f"{row['Name']} ({row['Medium']})"],
                 textposition="top right",
-                name=row["Name"],
                 hovertemplate=(
                     f"<b>Name:</b> {row['Name']}<br>"
+                    f"<b>Medium:</b> {row['Medium']}<br>"
                     f"<b>Coordinates:</b> {coords[0]}"
                 ),
             ))
 
     # Update layout
     fig.update_layout(
-        title="Interactive Map with Pipes and Landmarks",
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
-        dragmode="pan",  # Allow panning on the map
+        title="Pipes and Landmarks on Map",
+        dragmode="pan",
         margin=dict(l=0, r=0, t=30, b=0),
     )
 
     # Display the figure
     st.plotly_chart(fig, use_container_width=True)
 
-    # Add a note if rows were skipped due to invalid coordinates
+    # Warn about invalid rows
     invalid_rows = data[data["Coordinates"].isna()]
     if not invalid_rows.empty:
         st.warning(f"Skipped {len(invalid_rows)} rows due to invalid or missing coordinates.")
