@@ -1,25 +1,22 @@
 import pandas as pd
-import cv2
-import numpy as np
 import streamlit as st
+import plotly.graph_objects as go
 from PIL import Image
-import matplotlib.pyplot as plt
 
 # Streamlit title
-st.title("Annotated Map with Pipes and Landmarks")
+st.title("Interactive Map with Pipes and Landmarks")
 
 # File uploaders
-csv_file = st.file_uploader("Upload the .csv file", type=["csv"])
+csv_file = st.file_uploader("Upload the .csv file containing pipe and landmark data", type=["csv"])
 screenshot_file = st.file_uploader("Upload the map screenshot", type=["png", "jpg", "jpeg"])
 
 if csv_file and screenshot_file:
-    # Load CSV and screenshot
+    # Load CSV and image
     data = pd.read_csv(csv_file)
     screenshot = Image.open(screenshot_file)
-    screenshot = np.array(screenshot)  # Convert to NumPy array for OpenCV processing
-    screenshot_height, screenshot_width = screenshot.shape[:2]
+    screenshot_width, screenshot_height = screenshot.size
 
-    # Coordinate validation function
+    # Validate coordinates
     def validate_coordinates(coord):
         try:
             parsed = eval(coord) if isinstance(coord, str) else coord
@@ -28,48 +25,72 @@ if csv_file and screenshot_file:
             ):
                 return parsed
         except:
-            pass
-        return None
-
-    # Validate coordinates and filter valid data
+            return None
     data["Coordinates"] = data["Coordinates"].apply(validate_coordinates)
     valid_data = data.dropna(subset=["Coordinates"])
 
-    # Draw on the screenshot using OpenCV
-    annotated_image = screenshot.copy()
+    # Initialize Plotly figure
+    fig = go.Figure()
+
+    # Add background map screenshot
+    fig.add_layout_image(
+        dict(
+            source=screenshot,
+            xref="x",
+            yref="y",
+            x=0,
+            y=screenshot_height,
+            sizex=screenshot_width,
+            sizey=screenshot_height,
+            xanchor="left",
+            yanchor="top",
+            layer="below",
+        )
+    )
+
+    # Add lines and points
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
         if row["Length (meters)"] > 0:  # Draw pipes (lines)
-            for i in range(len(coords) - 1):
-                x1, y1 = coords[i]
-                x2, y2 = coords[i + 1]
-                cv2.line(annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)  # Red lines
-                cv2.putText(
-                    annotated_image,
-                    f"{row['Name']} ({row['Medium']})",
-                    (int((x1 + x2) / 2), int((y1 + y2) / 2)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 0),
-                    1,
+            x, y = zip(*coords)
+            y = [screenshot_height - yi for yi in y]  # Flip y-coordinates
+            fig.add_trace(go.Scatter(
+                x=x, y=y,
+                mode="lines+markers",
+                line=dict(color="blue", width=2),
+                marker=dict(size=8),
+                name=row['Name'],
+                hoverinfo="text",
+                hovertext=(
+                    f"<b>Name:</b> {row['Name']}<br>"
+                    f"<b>Medium:</b> {row['Medium']}<br>"
+                    f"<b>Coordinates:</b> {coords}"
                 )
+            ))
         elif row["Length (meters)"] == 0:  # Draw landmarks (points)
             x, y = coords[0]
-            cv2.circle(annotated_image, (int(x), int(y)), 8, (255, 0, 0), -1)  # Blue circles
-            cv2.putText(
-                annotated_image,
-                f"{row['Name']} ({row['Medium']})",
-                (int(x) + 10, int(y) - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (255, 255, 255),
-                1,
-            )
+            y = screenshot_height - y  # Flip y-coordinate
+            fig.add_trace(go.Scatter(
+                x=[x], y=[y],
+                mode="markers+text",
+                marker=dict(color="red", size=10),
+                text=[row['Name']],
+                textposition="top right",
+                hoverinfo="text",
+                hovertext=(
+                    f"<b>Name:</b> {row['Name']}<br>"
+                    f"<b>Coordinates:</b> {coords[0]}"
+                )
+            ))
 
-    # Display the annotated image
-    st.image(annotated_image, caption="Annotated Map with Pipes and Landmarks", use_column_width=True)
+    # Adjust layout
+    fig.update_layout(
+        title="Interactive Map with Pipes and Landmarks",
+        xaxis=dict(range=[0, screenshot_width], visible=False),
+        yaxis=dict(range=[0, screenshot_height], visible=False, scaleanchor="x", scaleratio=1),
+        margin=dict(l=0, r=0, t=30, b=0),
+        dragmode="pan",
+    )
 
-    # Save the annotated image
-    output_path = "/mnt/data/annotated_map.png"
-    cv2.imwrite(output_path, cv2.cvtColor(annotated_image, cv2.COLOR_RGB2BGR))
-    st.success(f"Annotated map saved successfully: {output_path}")
+    # Display the interactive map
+    st.plotly_chart(fig, use_container_width=True)
