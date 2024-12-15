@@ -3,4 +3,3 @@ pandas
 plotly
 Pillow
 numpy
-scipy
