@@ -5,7 +5,10 @@ from folium import plugins
 from streamlit_folium import folium_static
 
 # Streamlit Title
-st.title("Pipes and Landmarks on an Interactive Map")
+st.title("Interactive Map with Pipes, Landmarks, and 3D Satellite View")
+
+# Your Mapbox Token
+mapbox_token = "pk.eyJ1IjoicGFyc2ExMzgzIiwiYSI6ImNtMWRqZmZreDB6MHMyaXNianJpYWNhcGQifQ.hot5D26TtggHFx9IFM-9Vw"
 
 # File Uploaders
 csv_file = st.file_uploader("Upload the .csv file with coordinates", type=["csv"])
@@ -31,7 +34,9 @@ if csv_file:
     avg_lon = sum(lon for lon, _ in all_coords) / len(all_coords)
     map_center = [avg_lat, avg_lon]
 
-    m = folium.Map(location=map_center, zoom_start=15)
+    # Use Mapbox Satellite Tiles for 3D View
+    tile_layer = f"https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{{z}}/{{x}}/{{y}}@2x?access_token={mapbox_token}"
+    m = folium.Map(location=map_center, zoom_start=18, tiles=tile_layer, attr="Mapbox")
 
     # Add Pipes and Landmarks to the Map
     for _, row in valid_data.iterrows():
@@ -45,7 +50,11 @@ if csv_file:
                 color="blue",
                 weight=3,
                 popup=folium.Popup(
-                    f"Name: {row['Name']}<br>Medium: {row['Medium']}<br>Length: {row['Length (meters)']} meters",
+                    f"Name: {row['Name']}<br>"
+                    f"Medium: {row['Medium']}<br>"
+                    f"Length: {row['Length (meters)']} meters<br>"
+                    f"Start: {pipe_line[0]}<br>"
+                    f"End: {pipe_line[-1]}",
                     max_width=300
                 )
             ).add_to(m)
@@ -56,7 +65,8 @@ if csv_file:
                 location=(landmark[1], landmark[0]),  # (lat, lon)
                 icon=folium.Icon(color="red", icon="info-sign"),
                 popup=folium.Popup(
-                    f"Name: {row['Name']}<br>Coordinates: ({landmark[1]}, {landmark[0]})",
+                    f"Name: {row['Name']}<br>"
+                    f"Coordinates: ({landmark[1]}, {landmark[0]})",
                     max_width=300
                 )
             ).add_to(m)
@@ -65,4 +75,5 @@ if csv_file:
     plugins.Fullscreen().add_to(m)
 
     # Display Map
+    st.subheader("Interactive Map:")
     folium_static(m)
