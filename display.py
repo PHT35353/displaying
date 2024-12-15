@@ -45,10 +45,20 @@ if csv_file:
     # Add Pipes and Landmarks to the Map
     for _, row in valid_data.iterrows():
         coords = row["Coordinates"]
-        st.write(f"Processing Row: {row['Name']} | Coordinates: {coords}")  # Debugging output
 
-        # Check for Pipes (Multiple Coordinates)
-        if len(coords) > 1:  
+        # Check for Landmarks (Length == 0)
+        if row.get("Length (meters)", 1) == 0:  # Explicit check for landmarks
+            landmark = coords[0]  # Take the first coordinate
+            folium.Marker(
+                location=(landmark[1], landmark[0]),  # Latitude, Longitude
+                icon=folium.Icon(color="red", icon="info-sign"),
+                popup=folium.Popup(
+                    f"Name: {row['Name']}<br>"
+                    f"Coordinates: ({landmark[1]}, {landmark[0]})",
+                    max_width=300
+                )
+            ).add_to(m)
+        else:  # Pipes (Multiple Coordinates)
             pipe_line = [(lat, lon) for lon, lat in coords]  # Convert to (lat, lon)
             folium.PolyLine(
                 pipe_line,
@@ -60,19 +70,6 @@ if csv_file:
                     f"Length: {row['Length (meters)']} meters<br>"
                     f"Start: {pipe_line[0]}<br>"
                     f"End: {pipe_line[-1]}",
-                    max_width=300
-                )
-            ).add_to(m)
-        # Check for Landmarks (Single Coordinate)
-        elif len(coords) == 1:
-            landmark = coords[0]
-            st.write(f"Adding Landmark: {row['Name']} | Coordinates: {landmark}")  # Debugging output
-            folium.Marker(
-                location=(landmark[1], landmark[0]),  # Latitude, Longitude
-                icon=folium.Icon(color="red", icon="info-sign"),
-                popup=folium.Popup(
-                    f"Name: {row['Name']}<br>"
-                    f"Coordinates: ({landmark[1]}, {landmark[0]})",
                     max_width=300
                 )
             ).add_to(m)
